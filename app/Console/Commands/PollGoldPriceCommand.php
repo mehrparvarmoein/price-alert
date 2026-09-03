@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\PriceAlert\Contracts\GoldPriceProvider;
+use App\Domain\PriceAlert\Services\ProcessPriceCrossing;
 use App\Domain\PriceAlert\Services\Redis\GoldPriceState;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -16,16 +17,26 @@ class PollGoldPriceCommand extends Command
 
     protected $description = 'Poll the current gold price';
 
-    public function handle(GoldPriceProvider $provider, GoldPriceState $priceState): int
+    public function handle(GoldPriceProvider $provider, GoldPriceState $priceState, ProcessPriceCrossing $processCrossing): int
     {
         $price = $provider->getCurrentPrice();
 
         $previous = $priceState->update($price);
 
+        if ($previous === null || $previous === $price) {
+            return self::SUCCESS;
+        }
+
+        $claimed = $processCrossing->execute(
+            previousPrice: $previous,
+            currentPrice: $price,
+        );
+
         $this->info(sprintf(
-            'Price updated: %s (previous: %s)',
+            'Price: %s, Previous: %s, Claimed alerts: %d',
             $price,
-            $previous ?? 'N/A',
+            $previous,
+            $claimed,
         ));
 
         return self::SUCCESS;

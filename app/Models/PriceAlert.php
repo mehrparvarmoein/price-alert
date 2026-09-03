@@ -4,12 +4,17 @@ namespace App\Models;
 
 use App\Domain\PriceAlert\Enums\AlertDirection;
 use App\Domain\PriceAlert\Enums\AlertStatus;
+use Database\Factories\PriceAlertFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PriceAlert extends Model
 {
+    /** @use HasFactory<PriceAlertFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'target_price',

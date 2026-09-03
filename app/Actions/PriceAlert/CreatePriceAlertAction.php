@@ -6,6 +6,7 @@ use App\Domain\PriceAlert\Enums\AlertDirection;
 use App\Domain\PriceAlert\Enums\AlertStatus;
 use App\Domain\PriceAlert\Services\Redis\PriceAlertIndex;
 use App\Models\PriceAlert;
+use Throwable;
 
 class CreatePriceAlertAction
 {
@@ -21,11 +22,15 @@ class CreatePriceAlertAction
             'status' => AlertStatus::ACTIVE,
         ]);
 
-        $this->priceAlertIndex->add(
-            alertId: $alert->id,
-            targetPrice: $targetPrice,
-            direction: AlertDirection::from($direction),
-        );
+        try {
+            $this->priceAlertIndex->add(
+                alertId: $alert->id,
+                targetPrice: $targetPrice,
+                direction: AlertDirection::from($direction),
+            );
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return $alert;
     }

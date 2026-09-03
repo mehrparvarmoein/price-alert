@@ -36,4 +36,42 @@ class PriceAlertIndex
             AlertDirection::BELOW => self::BELOW_KEY,
         };
     }
+
+    /**
+     * @return list<int>
+     */
+    public function aboveCandidates(int $previous, int $current): array
+    {
+        if ($current <= $previous) {
+            return [];
+        }
+
+        return array_map(
+            'intval',
+            Redis::zrangebyscore(
+                self::ABOVE_KEY,
+                "($previous",
+                $current,
+            )
+        );
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function belowCandidates(int $previous, int $current): array
+    {
+        if ($current >= $previous) {
+            return [];
+        }
+
+        return array_map(
+            'intval',
+            Redis::zrangebyscore(
+                self::BELOW_KEY,
+                $current,
+                "($previous",
+            )
+        );
+    }
 }
