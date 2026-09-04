@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Domain\PriceAlert\Contracts\AlertNotificationSender;
 use App\Domain\PriceAlert\Contracts\GoldPriceProvider;
+use App\Domain\PriceAlert\Services\MockAlertNotificationSender;
 use App\Domain\PriceAlert\Services\MockGoldPriceProvider;
 use Illuminate\Support\ServiceProvider;
 
@@ -16,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             GoldPriceProvider::class,
             MockGoldPriceProvider::class,
+        );
+        $this->app->bind(
+            AlertNotificationSender::class,
+            MockAlertNotificationSender::class,
         );
     }
 
