@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\OutboxMessageFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class OutboxMessage extends Model
 {
+    /** @use HasFactory<OutboxMessageFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'type',
         'aggregate_type',

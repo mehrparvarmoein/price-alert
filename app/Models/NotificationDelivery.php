@@ -2,11 +2,17 @@
 
 namespace App\Models;
 
+use App\Domain\PriceAlert\Enums\NotificationDeliveryStatus;
+use Database\Factories\NotificationDeliveryFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NotificationDelivery extends Model
 {
+    /** @use HasFactory<NotificationDeliveryFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'alert_id',
         'idempotency_key',
@@ -18,6 +24,7 @@ class NotificationDelivery extends Model
     protected function casts(): array
     {
         return [
+            'status' => NotificationDeliveryStatus::class,
             'sent_at' => 'immutable_datetime',
             'failed_at' => 'immutable_datetime',
         ];
