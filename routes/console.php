@@ -1,6 +1,8 @@
 <?php
 
 use App\Console\Commands\PollGoldPriceCommand;
+use App\Console\Commands\RebuildPriceAlertIndexCommand;
+use App\Console\Commands\RecoverStalePriceAlertsCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -11,4 +13,12 @@ Artisan::command('inspire', function () {
 
 Schedule::command(PollGoldPriceCommand::class)
     ->everySecond()
+    ->withoutOverlapping();
+
+Schedule::command(RecoverStalePriceAlertsCommand::class)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command(RebuildPriceAlertIndexCommand::class)
+    ->everyFiveMinutes()
     ->withoutOverlapping();
