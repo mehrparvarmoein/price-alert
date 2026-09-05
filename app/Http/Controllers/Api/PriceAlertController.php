@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\PriceAlert\CreatePriceAlertAction;
+use App\Domain\PriceAlert\Actions\CreatePriceAlertAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePriceAlertRequest;
 use Illuminate\Http\JsonResponse;

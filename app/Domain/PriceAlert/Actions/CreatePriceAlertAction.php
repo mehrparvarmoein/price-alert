@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\PriceAlert;
+namespace App\Domain\PriceAlert\Actions;
 
 use App\Domain\PriceAlert\Enums\AlertDirection;
 use App\Domain\PriceAlert\Enums\AlertStatus;
