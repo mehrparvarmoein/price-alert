@@ -10,6 +10,7 @@ use App\Models\PriceAlert;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class SendPriceAlertNotificationJob implements ShouldQueue
 {
@@ -17,7 +18,14 @@ class SendPriceAlertNotificationJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(private int $alertId) {}
+    public array $backoff = [5, 30, 120];
+
+    public int $timeout = 30;
+
+    public function __construct(private int $alertId)
+    {
+        $this->onQueue('Notification');
+    }
 
     public function handle(AlertNotificationSender $sender): void
     {
@@ -62,5 +70,16 @@ class SendPriceAlertNotificationJob implements ShouldQueue
                 'processing_at' => null,
             ]);
         });
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        logger()->error(
+            'Price alert notification permanently failed.',
+            [
+                'alert_id' => $this->alertId,
+                'exception' => $exception,
+            ],
+        );
     }
 }

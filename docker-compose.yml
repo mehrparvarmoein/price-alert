@@ -56,6 +56,34 @@ services:
     networks:
       - wallgold
 
+  horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /var/www/html
+    command: php artisan horizon
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - app
+      - redis
+    networks:
+      - wallgold
+      
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: php artisan schedule:work
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - wallgold
+
 networks:
   wallgold:
 

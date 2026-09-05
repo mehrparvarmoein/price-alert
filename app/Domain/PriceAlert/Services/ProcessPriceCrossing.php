@@ -75,26 +75,4 @@ class ProcessPriceCrossing
 
         return $claimed;
     }
-
-    // public function execute(int $previousPrice, int $currentPrice): int
-    // {
-    //     $candidateIds = $this->matcher->execute(
-    //         previousPrice: $previousPrice,
-    //         currentPrice: $currentPrice,
-    //     );
-
-    //     $claimed = 0;
-
-    //     foreach ($candidateIds as $alertId) {
-    //         $alert = $this->claim->execute($alertId);
-
-    //         if ($alert === null) {
-    //             continue;
-    //         }
-
-    //         $claimed++;
-    //     }
-
-    //     return $claimed;
-    // }
 }

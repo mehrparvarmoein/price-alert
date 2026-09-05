@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\PollGoldPriceCommand;
+use App\Console\Commands\PublishOutboxMessagesCommand;
 use App\Console\Commands\RebuildPriceAlertIndexCommand;
 use App\Console\Commands\RecoverStalePriceAlertsCommand;
 use Illuminate\Foundation\Inspiring;
@@ -11,9 +12,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command(PollGoldPriceCommand::class)
-    ->everySecond()
-    ->withoutOverlapping();
+Schedule::command(PollGoldPriceCommand::class)->everyFiveSeconds();
 
 Schedule::command(RecoverStalePriceAlertsCommand::class)
     ->everyMinute()
@@ -22,3 +21,5 @@ Schedule::command(RecoverStalePriceAlertsCommand::class)
 Schedule::command(RebuildPriceAlertIndexCommand::class)
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command(PublishOutboxMessagesCommand::class)->everySecond();

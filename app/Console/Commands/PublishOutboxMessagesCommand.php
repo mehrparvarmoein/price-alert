@@ -16,21 +16,19 @@ class PublishOutboxMessagesCommand extends Command
 
     protected $description = 'Publish pending outbox messages to the queue';
 
+    private const BATCH_SIZE = 100;
+
     public function handle(): int
     {
         OutboxMessage::query()
             ->whereNull('processed_at')
             ->orderBy('id')
-            ->limit(100)
+            ->limit(self::BATCH_SIZE)
+            ->lock('FOR UPDATE SKIP LOCKED')
             ->get()
             ->each(function (OutboxMessage $message): void {
-                if ($message->type !== 'price_alert.notification_requested') {
-                    return;
-                }
-
-                SendPriceAlertNotificationJob::dispatch(
-                    $message->aggregate_id,
-                );
+                
+                $this->publish($message);
 
                 $message->update([
                     'processed_at' => now(),
@@ -38,5 +36,17 @@ class PublishOutboxMessagesCommand extends Command
             });
 
         return self::SUCCESS;
+    }
+
+    private function publish(OutboxMessage $message): void
+    {
+        match ($message->type) {
+            'price_alert.notification_requested'
+                => SendPriceAlertNotificationJob::dispatch(
+                    $message->aggregate_id,
+                ),
+
+            default => null,
+        };
     }
 }
