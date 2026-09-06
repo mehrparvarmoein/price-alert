@@ -39,41 +39,87 @@ class SendPriceAlertNotificationJob implements ShouldQueue
             return;
         }
 
-        $delivery = DB::transaction(function () use ($alert): NotificationDelivery {
-            return NotificationDelivery::firstOrCreate(
-                [
-                    'idempotency_key' => "price-alert:{$alert->id}",
-                ],
-                [
-                    'alert_id' => $alert->id,
-                    'status' => NotificationDeliveryStatus::PENDING,
-                ],
-            );
-        });
+        $delivery = NotificationDelivery::firstOrCreate(
+            [
+                'idempotency_key' => "price-alert:{$alert->id}",
+            ],
+            [
+                'alert_id' => $alert->id,
+                'status' => NotificationDeliveryStatus::PENDING,
+            ],
+        );
 
         if ($delivery->status === NotificationDeliveryStatus::SENT) {
             return;
         }
 
-        $sender->send($alert);
+        // Atomic claim: only one worker may transition PENDING/FAILED -> SENDING
+        $claimed = NotificationDelivery::query()
+            ->where('id', $delivery->id)
+            ->whereIn('status', [
+                NotificationDeliveryStatus::PENDING,
+                NotificationDeliveryStatus::FAILED,
+            ])
+            ->update([
+                'status' => NotificationDeliveryStatus::SENDING,
+                'sending_at' => now(),
+            ]);
+
+        if ($claimed !== 1) {
+            return;
+        }
+
+        try {
+            $sender->send($alert);
+        } catch (Throwable $e) {
+            NotificationDelivery::query()
+                ->where('id', $delivery->id)
+                ->where('status', NotificationDeliveryStatus::SENDING)
+                ->update([
+                    'status' => NotificationDeliveryStatus::PENDING,
+                    'sending_at' => null,
+                ]);
+
+            throw $e;
+        }
 
         DB::transaction(function () use ($alert, $delivery): void {
-            $delivery->update([
-                'status' => NotificationDeliveryStatus::SENT,
-                'sent_at' => now(),
-                'failed_at' => null,
-            ]);
+            NotificationDelivery::query()
+                ->where('id', $delivery->id)
+                ->where('status', NotificationDeliveryStatus::SENDING)
+                ->update([
+                    'status' => NotificationDeliveryStatus::SENT,
+                    'sending_at' => null,
+                    'sent_at' => now(),
+                    'failed_at' => null,
+                ]);
 
-            $alert->update([
-                'status' => AlertStatus::TRIGGERED,
-                'triggered_at' => now(),
-                'processing_at' => null,
-            ]);
+            PriceAlert::query()
+                ->whereKey($alert->id)
+                ->where('status', AlertStatus::PROCESSING)
+                ->update([
+                    'status' => AlertStatus::TRIGGERED,
+                    'triggered_at' => now(),
+                    'processing_at' => null,
+                ]);
         });
     }
 
     public function failed(?Throwable $exception): void
     {
+        NotificationDelivery::query()
+            ->where('idempotency_key', "price-alert:{$this->alertId}")
+            ->whereIn('status', [
+                NotificationDeliveryStatus::PENDING,
+                NotificationDeliveryStatus::SENDING,
+                NotificationDeliveryStatus::FAILED,
+            ])
+            ->update([
+                'status' => NotificationDeliveryStatus::FAILED,
+                'sending_at' => null,
+                'failed_at' => now(),
+            ]);
+
         logger()->error(
             'Price alert notification permanently failed.',
             [

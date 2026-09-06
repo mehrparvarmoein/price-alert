@@ -17,6 +17,7 @@ class NotificationDelivery extends Model
         'alert_id',
         'idempotency_key',
         'status',
+        'sending_at',
         'sent_at',
         'failed_at',
     ];
@@ -25,6 +26,7 @@ class NotificationDelivery extends Model
     {
         return [
             'status' => NotificationDeliveryStatus::class,
+            'sending_at' => 'immutable_datetime',
             'sent_at' => 'immutable_datetime',
             'failed_at' => 'immutable_datetime',
         ];
