@@ -8,7 +8,6 @@ use App\Models\PriceAlert;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Redis;
 
 #[Signature('alerts:rebuild-index')]
 #[Description('Rebuild Redis price alert indexes from PostgreSQL')]

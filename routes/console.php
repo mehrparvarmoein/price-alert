@@ -12,7 +12,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command(PollGoldPriceCommand::class)->everyFiveSeconds();
+Schedule::command(PollGoldPriceCommand::class)
+    ->everySecond()
+    ->withoutOverlapping();
 
 Schedule::command(RecoverStalePriceAlertsCommand::class)
     ->everyMinute()
@@ -22,4 +24,6 @@ Schedule::command(RebuildPriceAlertIndexCommand::class)
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
-Schedule::command(PublishOutboxMessagesCommand::class)->everySecond();
+Schedule::command(PublishOutboxMessagesCommand::class)
+    ->everySecond()
+    ->withoutOverlapping();

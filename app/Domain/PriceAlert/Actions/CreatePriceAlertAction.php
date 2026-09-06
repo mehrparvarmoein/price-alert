@@ -29,7 +29,7 @@ class CreatePriceAlertAction
                 direction: AlertDirection::from($direction),
             );
         } catch (Throwable $e) {
-            report($e);
+            report($e); // alerts:rebuild-index (runs every 5 min) heals this
         }
 
         return $alert;

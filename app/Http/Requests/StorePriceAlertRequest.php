@@ -25,7 +25,7 @@ class StorePriceAlertRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'target_price' => ['required', 'integer'],
+            'target_price' => ['required', 'integer', 'min:1','max:999999999'],
             'direction' => ['required', Rule::enum(AlertDirection::class)],
         ];
     }
