@@ -7,6 +7,7 @@ use App\Models\OutboxMessage;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 #[Signature('outbox:publish')]
 #[Description('Publish pending outbox messages to the queue')]
@@ -20,20 +21,21 @@ class PublishOutboxMessagesCommand extends Command
 
     public function handle(): int
     {
-        OutboxMessage::query()
-            ->whereNull('processed_at')
-            ->orderBy('id')
-            ->limit(self::BATCH_SIZE)
-            ->lock('FOR UPDATE SKIP LOCKED')
-            ->get()
-            ->each(function (OutboxMessage $message): void {
-                
-                $this->publish($message);
+        DB::transaction(function (): void {
+            OutboxMessage::query()
+                ->whereNull('processed_at')
+                ->orderBy('id')
+                ->limit(self::BATCH_SIZE)
+                ->lock('FOR UPDATE SKIP LOCKED')
+                ->get()
+                ->each(function (OutboxMessage $message): void {
+                    $this->publish($message);
 
-                $message->update([
-                    'processed_at' => now(),
-                ]);
-            });
+                    $message->update([
+                        'processed_at' => now(),
+                    ]);
+                });
+        });
 
         return self::SUCCESS;
     }
