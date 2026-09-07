@@ -14,14 +14,14 @@ class GoldPriceState
     {
         $value = Redis::get(self::CURRENT_KEY);
 
-        return $value ?? null;
+        return $value === null ? null : (int) $value;
     }
 
     public function previous(): ?int
     {
         $value = Redis::get(self::PREVIOUS_KEY);
 
-        return $value ?? null;
+        return $value === null ? null : (int) $value;
     }
 
     public function update(int $price): ?int

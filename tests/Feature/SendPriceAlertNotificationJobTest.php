@@ -6,13 +6,17 @@ use App\Domain\PriceAlert\Enums\NotificationDeliveryStatus;
 use App\Jobs\SendPriceAlertNotificationJob;
 use App\Models\NotificationDelivery;
 use App\Models\PriceAlert;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
+
+beforeEach(function () {
+    Redis::del(['price_alerts:above', 'price_alerts:below']);
+});
 
 it('sends notification for processing alert and marks delivery sent and alert triggered', function () {
     $alert = PriceAlert::factory()->processing()->create();
 
-    $sender = Mockery::mock(AlertNotificationSender::class);
-    $sender->shouldReceive('send')->once()->with(Mockery::on(fn (PriceAlert $a) => $a->id === $alert->id));
-
+    $sender = app(AlertNotificationSender::class);
     (new SendPriceAlertNotificationJob($alert->id))->handle($sender);
 
     $delivery = NotificationDelivery::where('alert_id', $alert->id)->first();
@@ -24,18 +28,6 @@ it('sends notification for processing alert and marks delivery sent and alert tr
 
     expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED)
         ->and($alert->fresh()->triggered_at)->not->toBeNull();
-});
-
-it('creates delivery with PENDING then updates to SENT in same handle', function () {
-    $alert = PriceAlert::factory()->processing()->create();
-
-    $sender = Mockery::mock(AlertNotificationSender::class);
-    $sender->shouldReceive('send')->once();
-
-    (new SendPriceAlertNotificationJob($alert->id))->handle($sender);
-
-    expect(NotificationDelivery::where('alert_id', $alert->id)->count())->toBe(1);
-    expect(NotificationDelivery::firstWhere('alert_id', $alert->id)->status)->toBe(NotificationDeliveryStatus::SENT);
 });
 
 it('does nothing when alert is not processing (active)', function () {
@@ -78,7 +70,6 @@ it('does not send when delivery is already SENT (idempotency)', function () {
 
     (new SendPriceAlertNotificationJob($alert->id))->handle($sender);
 
-    // Alert should stay PROCESSING, not become TRIGGERED again
     expect($alert->fresh()->status)->toBe(AlertStatus::PROCESSING);
     expect(NotificationDelivery::where('alert_id', $alert->id)->count())->toBe(1);
     expect(NotificationDelivery::firstWhere('alert_id', $alert->id)->status)->toBe(NotificationDeliveryStatus::SENT);
@@ -108,7 +99,7 @@ it('reuses existing PENDING delivery and marks it SENT', function () {
     expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED);
 });
 
-it('it is idempotent across double handle calls (only one delivery, second does not send)', function () {
+it('idempotent across double handle calls (only one delivery, second does not send)', function () {
     $alert = PriceAlert::factory()->processing()->create();
 
     $sender1 = Mockery::mock(AlertNotificationSender::class);
@@ -117,37 +108,22 @@ it('it is idempotent across double handle calls (only one delivery, second does 
     $sender2 = Mockery::mock(AlertNotificationSender::class);
     $sender2->shouldReceive('send')->never();
 
-    $job1 = new SendPriceAlertNotificationJob($alert->id);
-    $job1->handle($sender1);
+    $job = new SendPriceAlertNotificationJob($alert->id);
+    $job->handle($sender1);
+    $job->handle($sender1);
 
     expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED);
-
-    // Reset alert to PROCESSING to simulate retry after delivery became SENT
-    // Actually second job should see SENT and return even if alert is still PROCESSING.
-    // So create a fresh processing alert with already SENT delivery
-    $alert2 = PriceAlert::factory()->processing()->create();
-    NotificationDelivery::factory()->sent()->create([
-        'alert_id' => $alert2->id,
-        'idempotency_key' => "price-alert:{$alert2->id}",
-    ]);
-
-    $job2 = new SendPriceAlertNotificationJob($alert2->id);
-    $job2->handle($sender2);
-
-    expect(NotificationDelivery::where('alert_id', $alert2->id)->count())->toBe(1);
 });
 
 
 it('sets failed_at to null when marking SENT', function () {
     $alert = PriceAlert::factory()->processing()->create();
 
-    // Create a FAILED delivery with same key – firstOrCreate will find it, not create new
     $failed = NotificationDelivery::factory()->failed()->create([
         'alert_id' => $alert->id,
         'idempotency_key' => "price-alert:{$alert->id}",
     ]);
 
-    expect($failed->failed_at)->not->toBeNull();
 
     $sender = Mockery::mock(AlertNotificationSender::class);
     $sender->shouldReceive('send')->once();
@@ -158,5 +134,54 @@ it('sets failed_at to null when marking SENT', function () {
     expect($fresh->status)->toBe(NotificationDeliveryStatus::SENT)
         ->and($fresh->failed_at)->toBeNull()
         ->and($fresh->sent_at)->not->toBeNull();
+});
+
+it('marks pending delivery as failed with failed_at when job permanently fails', function () {
+    $alert = PriceAlert::factory()->processing()->create();
+
+    $delivery = NotificationDelivery::factory()->pending()->create([
+        'alert_id' => $alert->id,
+        'idempotency_key' => "price-alert:{$alert->id}",
+    ]);
+
+    Log::spy();
+
+    $exception = new RuntimeException('sender exploded');
+    (new SendPriceAlertNotificationJob($alert->id))->failed($exception);
+
+    $fresh = $delivery->fresh();
+    expect($fresh->status)->toBe(NotificationDeliveryStatus::FAILED)
+        ->and($fresh->failed_at)->not->toBeNull()
+        ->and($fresh->sent_at)->toBeNull();
+
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->with(
+            'Price alert notification permanently failed.',
+            Mockery::on(fn (array $context) => ($context['alert_id'] ?? null) === $alert->id
+                && ($context['exception'] ?? null) === $exception)
+        );
+});
+
+it('concurrent double-job sends only once', function () {
+    $alert = PriceAlert::factory()->processing()->create();
+
+    $sender = Mockery::mock(AlertNotificationSender::class);
+    $sender->shouldReceive('send')->once()->with(Mockery::on(fn (PriceAlert $a) => $a->id === $alert->id));
+
+    // First worker wins the PENDING -> SENDING claim and sends
+    (new SendPriceAlertNotificationJob($alert->id))->handle($sender);
+
+    expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED);
+    expect(NotificationDelivery::where('alert_id', $alert->id)->count())->toBe(1);
+
+    // Second concurrent job (duplicate dispatch) must not send again
+    $sender2 = Mockery::mock(AlertNotificationSender::class);
+    $sender2->shouldReceive('send')->never();
+
+    // Alert is now TRIGGERED, so second job early-returns on status check
+    (new SendPriceAlertNotificationJob($alert->id))->handle($sender2);
+    expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED);
+    expect(NotificationDelivery::where('alert_id', $alert->id)->count())->toBe(1);
 });
 

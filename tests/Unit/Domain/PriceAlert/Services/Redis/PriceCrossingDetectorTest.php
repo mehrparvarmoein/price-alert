@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 use App\Domain\PriceAlert\Enums\AlertDirection;
 use App\Domain\PriceAlert\Services\PriceCrossingDetector;
 
@@ -45,9 +43,9 @@ it('does not trigger above when price was already at target', function () {
 it('does not trigger above when price remains below target', function () {
     expect(
         $this->detector->crossed(
-            previousPrice: 349800,
-            currentPrice: 349900,
-            targetPrice: 350000,
+            previousPrice: 3498,
+            currentPrice: 3499,
+            targetPrice: 3500,
             direction: AlertDirection::ABOVE,
         )
     )->toBeFalse();

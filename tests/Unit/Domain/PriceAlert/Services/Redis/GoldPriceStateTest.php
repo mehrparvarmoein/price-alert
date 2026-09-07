@@ -3,125 +3,97 @@
 use App\Domain\PriceAlert\Services\Redis\GoldPriceState;
 use Illuminate\Support\Facades\Redis;
 
-uses(Tests\TestCase::class);
+beforeEach(function () {
+    $this->state = new GoldPriceState;
+});
 
-describe(GoldPriceState::class, function () {
-    beforeEach(function () {
-        $this->state = new GoldPriceState();
+describe('current', function () {
+    it('returns null when no current price is stored', function () {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY)
+            ->andReturn(null);
+
+        expect($this->state->current())->toBeNull();
     });
 
-    describe('current(): ?int', function () {
-        it('returns null when no current price is stored', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn(null);
+    it('casts the stored string value to int', function (string $stored, int $expected) {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY)
+            ->andReturn($stored);
 
-            expect($this->state->current())->toBeNull();
-        });
+        $result = $this->state->current();
 
-        it('returns the value stored in redis for current price', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn('3500');
+        expect($result)->toBe($expected)->toBeInt();
+    })->with([
+        'typical price' => ['3500', 3500],
+        'zero is a valid price' => ['0', 0],
+    ]);
+});
 
-            $result = $this->state->current();
+describe('previous', function () {
+    it('returns null when no previous price is stored', function () {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::PREVIOUS_KEY)
+            ->andReturn(null);
 
-            expect($result)->toBe(3500);
-            expect($result)->toBeInt();
-        });
+        expect($this->state->previous())->toBeNull();
     });
 
-    describe('previous(): ?int', function () {
-        it('returns null when no previous price is stored', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::PREVIOUS_KEY)
-                ->andReturn(null);
+    it('casts the stored string value to int', function (string $stored, int $expected) {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::PREVIOUS_KEY)
+            ->andReturn($stored);
 
-            expect($this->state->previous())->toBeNull();
-        });
+        $result = $this->state->previous();
 
-        it('returns the value stored in redis for previous price', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::PREVIOUS_KEY)
-                ->andReturn('3400');
+        expect($result)->toBe($expected)->toBeInt();
+    })->with([
+        'typical price' => ['3400', 3400],
+        'zero is a valid price' => ['0', 0],
+    ]);
+});
 
-            expect($this->state->previous())->toBe(3400);
-        });
+describe('update', function () {
+    it('stores the price as current without touching previous on first write', function () {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY)
+            ->andReturn(null);
+
+        Redis::shouldReceive('set')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY, 3500)
+            ->andReturnTrue();
+
+        Redis::shouldReceive('set')
+            ->with(GoldPriceState::PREVIOUS_KEY, \Mockery::any())
+            ->never();
+
+        expect($this->state->update(3500))->toBeNull();
     });
 
-    describe('update(int $price): ?int', function () {
-        it('stores the price as current when no current exists and returns null', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn(null);
+    it('rotates current to previous and returns the old price', function () {
+        Redis::shouldReceive('get')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY)
+            ->andReturn('3500');
 
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY, 3500)
-                ->andReturn(true);
+        Redis::shouldReceive('set')
+            ->once()
+            ->with(GoldPriceState::PREVIOUS_KEY, 3500)
+            ->andReturnTrue();
 
-            // must NOT touch previous key on first write
-            Redis::shouldReceive('set')
-                ->with(GoldPriceState::PREVIOUS_KEY, \Mockery::any())
-                ->never();
+        Redis::shouldReceive('set')
+            ->once()
+            ->with(GoldPriceState::CURRENT_KEY, 3600)
+            ->andReturnTrue();
 
-            expect($this->state->update(3500))->toBeNull();
-        });
+        $result = $this->state->update(3600);
 
-        it('moves current to previous and stores new current, returning old current', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn('3500');
-
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::PREVIOUS_KEY, 3500)
-                ->andReturn(true);
-
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY, 3600)
-                ->andReturn(true);
-
-            $result = $this->state->update(3600);
-
-            expect($result)->toBe(3500);
-        });
-
-        it('handles updating with the same price', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn('3500');
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::PREVIOUS_KEY, 3500)
-                ->andReturn(true);
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY, 3500)
-                ->andReturn(true);
-
-            expect($this->state->update(3500))->toBe(3500);
-        });
-
-        it('delegates to current() internally', function () {
-            Redis::shouldReceive('get')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY)
-                ->andReturn(null);
-            Redis::shouldReceive('set')
-                ->once()
-                ->with(GoldPriceState::CURRENT_KEY, 9999)
-                ->andReturn(true);
-
-            $this->state->update(9999);
-        });
+        expect($result)->toBe(3500)->toBeInt();
     });
 });

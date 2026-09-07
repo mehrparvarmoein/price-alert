@@ -48,12 +48,10 @@ it('does not publish already processed messages', function () {
 
     OutboxMessage::factory()->processed()->create([
         'aggregate_id' => 1,
-        'payload' => [],
     ]);
 
     $pending = OutboxMessage::factory()->pending()->create([
         'aggregate_id' => 2,
-        'payload' => [],
     ]);
 
     $this->artisan(PublishOutboxMessagesCommand::class)->assertSuccessful();

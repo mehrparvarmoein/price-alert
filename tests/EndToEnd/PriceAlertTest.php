@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\PriceAlert\Enums\AlertStatus;
 use App\Domain\PriceAlert\Services\ProcessPriceCrossing;
 use App\Domain\PriceAlert\Services\Redis\PriceAlertIndex;
 use App\Models\PriceAlert;
@@ -140,5 +141,5 @@ it('created alerts participate in price crossing detection', function () {
 
     $alert = PriceAlert::firstWhere('user_id', $this->user->id);
 
-    expect(PriceAlert::find($alert->id)->status)->toBe(\App\Domain\PriceAlert\Enums\AlertStatus::PROCESSING);
+    expect(PriceAlert::find($alert->id)->status)->toBe(AlertStatus::PROCESSING);
 });

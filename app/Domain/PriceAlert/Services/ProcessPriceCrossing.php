@@ -35,21 +35,15 @@ class ProcessPriceCrossing
             return 0;
         }
 
-        //check candidateIds from database as source of truth
+        //check candidateIds with database as source of truth
         $alerts = PriceAlert::query()
             ->whereIn('id', $candidateIds)
             ->where('status', AlertStatus::ACTIVE)
-            ->get()
-            ->keyBy('id');
+            ->get();
 
         $claimed = 0;
 
-        foreach ($candidateIds as $alertId) {
-            $alert = $alerts->get($alertId);
-
-            if ($alert === null) {
-                continue;
-            }
+        foreach ($alerts as $alert) {
 
             if (! $this->detector->crossed(
                 previousPrice: $previousPrice,
@@ -60,7 +54,7 @@ class ProcessPriceCrossing
                 continue;
             }
 
-            //atomic update alert from active status to processing status
+            //atomic update alert from active status to processing status and create outbox message
             if ($this->claim->execute($alert->id) === null) {
                 continue;
             }

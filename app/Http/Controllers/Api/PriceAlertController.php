@@ -14,12 +14,12 @@ class PriceAlertController extends Controller
         $alert = $action->handle(
             userId: $request->user()->id,
             targetPrice: $request->input('target_price'),
-            direction: $request->string('direction')->toString(),
+            direction: $request->input('direction'),
         );
 
         return response()->json([
             'data' => [
-                'target_price' => $request->input('target_price'),
+                'target_price' => $alert->target_price,
                 'direction' => $alert->direction->value,
                 'status' => $alert->status->value,
             ],

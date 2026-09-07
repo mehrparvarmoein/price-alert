@@ -1,19 +1,15 @@
 <?php
 
-use App\Domain\PriceAlert\Enums\AlertDirection;
+use App\Console\Commands\PublishOutboxMessagesCommand;
 use App\Domain\PriceAlert\Enums\AlertStatus;
 use App\Domain\PriceAlert\Enums\NotificationDeliveryStatus;
 use App\Domain\PriceAlert\Services\ProcessPriceCrossing;
 use App\Domain\PriceAlert\Services\Redis\PriceAlertIndex;
-use App\Jobs\SendPriceAlertNotificationJob;
 use App\Models\NotificationDelivery;
 use App\Models\OutboxMessage;
 use App\Models\PriceAlert;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Redis;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Redis::del([
@@ -22,6 +18,9 @@ beforeEach(function () {
         'gold:current_price',
         'gold:previous_price',
     ]);
+
+    $this->priceAlertIndex = app(PriceAlertIndex::class);
+    $this->processor = app(ProcessPriceCrossing::class);
 });
 
 it('processes a price crossing and sends one notification', function () {
@@ -29,13 +28,13 @@ it('processes a price crossing and sends one notification', function () {
         'target_price' => 3500,
     ]);
 
-    app(PriceAlertIndex::class)->add(
+    $this->priceAlertIndex->add(
         alertId: $alert->id,
         targetPrice: $alert->target_price,
         direction: $alert->direction,
     );
 
-    $claimed = app(ProcessPriceCrossing::class)->execute(
+    $claimed = $this->processor->execute(
         previousPrice: 3490,
         currentPrice: 3505,
     );
@@ -47,12 +46,11 @@ it('processes a price crossing and sends one notification', function () {
     expect(
         OutboxMessage::query()
             ->where('aggregate_id', $alert->id)
+            ->whereNull('processed_at')
             ->count()
     )->toBe(1);
 
-    $job = new SendPriceAlertNotificationJob($alert->id);
-
-    $job->handle(app(\App\Domain\PriceAlert\Contracts\AlertNotificationSender::class));
+    Artisan::call(PublishOutboxMessagesCommand::class);
 
     expect($alert->fresh()->status)->toBe(AlertStatus::TRIGGERED);
 
@@ -62,6 +60,17 @@ it('processes a price crossing and sends one notification', function () {
             ->where('status', NotificationDeliveryStatus::SENT)
             ->count()
     )->toBe(1);
+
+    expect(
+        OutboxMessage::query()
+            ->where('aggregate_id', $alert->id)
+            ->whereNotNull('processed_at')
+            ->count()
+    )->toBe(1);
+
+    expect(
+        Redis::zscore('price_alerts:above', '1')
+    )->toBeFalse();
 });
 
 it('does not process the same alert twice', function () {
@@ -70,20 +79,18 @@ it('does not process the same alert twice', function () {
         'target_price' => 3500,
     ]);
 
-    app(PriceAlertIndex::class)->add(
+    $this->priceAlertIndex->add(
         $alert->id,
         $alert->target_price,
         $alert->direction,
     );
 
-    $processor = app(ProcessPriceCrossing::class);
-
-    $first = $processor->execute(
+    $first = $this->processor->execute(
         previousPrice: 3490,
         currentPrice: 3505,
     );
 
-    $second = $processor->execute(
+    $second = $this->processor->execute(
         previousPrice: 3490,
         currentPrice: 3505,
     );
