@@ -42,6 +42,6 @@ class PriceAlert extends Model
 
     public function notificationDelivery(): HasOne
     {
-        return $this->hasOne(NotificationDelivery::class);
+        return $this->hasOne(NotificationDelivery::class, 'alert_id');
     }
 }
