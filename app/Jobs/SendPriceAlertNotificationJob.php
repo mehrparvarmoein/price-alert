@@ -39,7 +39,7 @@ class SendPriceAlertNotificationJob implements ShouldQueue
             return;
         }
 
-        $delivery = NotificationDelivery::firstOrCreate(
+        $delivery = NotificationDelivery::query()->createOrFirst(
             [
                 'idempotency_key' => "price-alert:{$alert->id}",
             ],

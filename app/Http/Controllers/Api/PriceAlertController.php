@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\PriceAlert\Actions\CreatePriceAlertAction;
+use App\Domain\PriceAlert\Enums\AlertDirection;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePriceAlertRequest;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,7 @@ class PriceAlertController extends Controller
         $alert = $action->handle(
             userId: $request->user()->id,
             targetPrice: $request->input('target_price'),
-            direction: $request->input('direction'),
+            direction: $request->enum('direction', AlertDirection::class),
         );
 
         return response()->json([

@@ -13,9 +13,6 @@ use Illuminate\Support\Facades\DB;
 #[Description('Publish pending outbox messages to the queue')]
 class PublishOutboxMessagesCommand extends Command
 {
-    protected $signature = 'outbox:publish';
-
-    protected $description = 'Publish pending outbox messages to the queue';
 
     private const BATCH_SIZE = 100;
 
@@ -23,7 +20,7 @@ class PublishOutboxMessagesCommand extends Command
     {
         DB::transaction(function (): void {
             OutboxMessage::query()
-                ->whereNull('processed_at')
+                ->unprocessed()
                 ->orderBy('id')
                 ->limit(self::BATCH_SIZE)
                 ->lock('FOR UPDATE SKIP LOCKED')
@@ -48,7 +45,10 @@ class PublishOutboxMessagesCommand extends Command
                     $message->aggregate_id,
                 ),
 
-            default => null,
+            default => logger()->warning('Unknown outbox message type skipped.', [
+                'outbox_id' => $message->id,
+                'type' => $message->type,
+            ]),
         };
     }
 }

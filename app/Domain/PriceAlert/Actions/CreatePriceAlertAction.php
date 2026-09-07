@@ -13,12 +13,12 @@ class CreatePriceAlertAction
 
     public function __construct(private PriceAlertIndex $priceAlertIndex) {}
 
-    public function handle(int $userId, int $targetPrice, string $direction): PriceAlert
+    public function handle(int $userId, int $targetPrice, AlertDirection $direction): PriceAlert
     {
         $alert = PriceAlert::create([
             'user_id' => $userId,
             'target_price' => $targetPrice,
-            'direction' => AlertDirection::from($direction),
+            'direction' => $direction,
             'status' => AlertStatus::ACTIVE,
         ]);
 
@@ -26,7 +26,7 @@ class CreatePriceAlertAction
             $this->priceAlertIndex->add(
                 alertId: $alert->id,
                 targetPrice: $targetPrice,
-                direction: AlertDirection::from($direction),
+                direction: $direction,
             );
         } catch (Throwable $e) {
             report($e); // alerts:rebuild-index (runs every 5 min) heals this

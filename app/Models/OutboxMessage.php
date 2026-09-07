@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\OutboxMessageFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -27,7 +28,7 @@ class OutboxMessage extends Model
         ];
     }
 
-    public function scopeUnprocessed($query)
+    public function scopeUnprocessed(Builder $query): Builder
     {
         return $query->whereNull('processed_at');
     }

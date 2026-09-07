@@ -13,9 +13,6 @@ use Illuminate\Console\Command;
 #[Description('Poll the current gold price')]
 class PollGoldPriceCommand extends Command
 {
-    protected $signature = 'gold:poll';
-
-    protected $description = 'Poll the current gold price';
 
     public function handle(GoldPriceProvider $provider, GoldPriceState $priceState, ProcessPriceCrossing $processCrossing): int
     {

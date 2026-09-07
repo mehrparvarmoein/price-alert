@@ -11,11 +11,7 @@ use Illuminate\Console\Command;
 #[Description('Recover price alerts stuck in processing state')]
 class RecoverStalePriceAlertsCommand extends Command
 {
-    protected $signature = 'alerts:recover-stale';
-
-    protected $description = 'Recover price alerts stuck in processing state';
-
-    public function handle( RecoverStalePriceAlerts $recovery,): int
+    public function handle(RecoverStalePriceAlerts $recovery): int
     {
         $count = $recovery->execute();
 
