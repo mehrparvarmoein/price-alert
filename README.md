@@ -15,6 +15,7 @@ The system allows users to create price alerts for a gold price. When the price 
 * Notification idempotency
 * Retry and stale-processing recovery
 * Redis index rebuild capability
+* Delete active (not yet triggered) alerts, including their Redis index entry
 * Docker-based local environment
 * Unit, feature and end-to-end tests
 * Health check endpoint
@@ -45,8 +46,8 @@ The system separates the domain logic from infrastructure concerns.
                          ┌──────────────────────┐
                          │ Redis Sorted Sets    │
                          │                      │
-                         │ ABOVE   target price│
-                         │ BELOW   target price│
+                         │ ABOVE   target price │
+                         │ BELOW   target price │
                          └──────────┬───────────┘
                                     │
                               Candidate IDs
@@ -448,6 +449,42 @@ above
 below
 ```
 
+### Delete Price Alert
+
+```http
+DELETE /api/alerts/{alert}
+```
+
+Authentication:
+
+```text
+Sanctum
+```
+
+Rules:
+
+* Only alerts owned by the authenticated user can be deleted
+* Only `ACTIVE` alerts that have not been triggered can be deleted
+* Alerts in `PROCESSING` or `TRIGGERED` state cannot be deleted
+* On success, the alert row is removed from PostgreSQL and its member is removed from the Redis Sorted Set index
+* The delete is atomic (`DELETE ... WHERE status = 'active'`), so it can never race with a price-crossing claim
+
+Responses:
+
+```text
+204 No Content        deleted successfully
+404 Not Found         alert does not exist or belongs to another user
+400 Bad Request       alert is processing or already triggered
+```
+
+Error response:
+
+```json
+{
+    "message": "Only active alerts that have not been triggered can be deleted."
+}
+```
+
 ---
 
 ## Running Locally
@@ -552,6 +589,7 @@ The test suite covers:
 * Notification delivery
 * Failure and retry behavior
 * Redis index rebuilding
+* Alert deletion (ownership, state rules, Redis index cleanup)
 * API validation
 * Authentication
 * End-to-end price crossing flow

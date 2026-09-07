@@ -13,5 +13,7 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/alerts', [PriceAlertController::class, 'store'])
         ->middleware('throttle:60,1');
-});
 
+    Route::delete('/alerts/{alert}', [PriceAlertController::class, 'destroy'])
+        ->middleware('throttle:60,1');
+});
