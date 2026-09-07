@@ -61,6 +61,7 @@ services:
       context: .
       dockerfile: Dockerfile
     working_dir: /var/www/html
+    restart: unless-stopped
     command: php artisan horizon
     volumes:
       - .:/var/www/html
@@ -75,6 +76,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     command: php artisan schedule:work
     volumes:
       - .:/var/www/html
